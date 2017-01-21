@@ -363,16 +363,26 @@ sub controll {
     my $allprocs = 0;
     my @drophost =(); #除外サーバリスト
     for (my $j=0; $j <= $#pcountres; $j++){
-        my @i = $pcountres[$j]->{acclist};
-           $allprocs = $allprocs + $#i;
+        my $i = $pcountres[$j]->{acclist};
+           my @ii = @$i;
+           $allprocs = $allprocs + $#ii + 1;
+
+           $self->app->log->info("DEBUG: acclist count: $#ii ");
+
            # 上限に達しているサーバをリストする
-           if ( $#i >= 80 ) {
+           if ( $#ii >= 79 ) {
               push (@drophost, $hostlist[$j]); 
               $self->app->log->info("DROP hostlist: $hostlist[$j] ");
               }
     } # for
 
-    if ( ($proclimit * $#hostlist) < $allprocs) {
+    $self->app->log->info("DEBUG: allprocs: $allprocs ");
+
+    my $limitcount = $proclimit * ($#hostlist + 1 );
+
+    $self->app->log->info("DEBUG: limitcount: $limitcount ");
+
+    if ( $limitcount < $allprocs) {
            $self->app->log->info("allprocs: $allprocs  NOT EXEC NPC.........");
            return;  # 上限を超えてプロセスは起動させない
         }
@@ -383,8 +393,9 @@ sub controll {
   foreach my $host (@hostlist){
       #host中の稼働プロセス数     
       my $hps = shift(@pcountres);   # @pcountresは消えていく
-      my @haccs = $hps->{acclist};
-         $hostprocs = { %$hostprocs, $host =>  $#haccs };   #連想配列の追加
+      my $haccs_tmp = $hps->{acclist};
+      my @haccs = @$haccs_tmp;
+         $hostprocs = { %$hostprocs, $host =>  $#haccs + 1 };   #連想配列の追加
 
       # 利用アカウントのチェック
           foreach my $j (@haccs){
@@ -392,6 +403,7 @@ sub controll {
               for my $i (@$glist){
                   if ( $j eq $i->{email}) {
                                               $i->{run} = "exist";
+                                              $self->app->log->debug("DEBUG: $i->{email} EXIST");
                                               }
                 } #for
              } #if npcuser
@@ -400,24 +412,31 @@ sub controll {
               for my $i (@$sglist){
                   if ( $j eq $i->{email}) {
                                               $i->{run} = "exist";
+                                              $self->app->log->debug("DEBUG: $i->{email} EXIST");
                                               }
                 } #for
             } #if searchnpc
           } #foreach @haccs
       } #foreach @hostlist
 
+      my $debugvar = to_json($hostprocs);
+      $self->app->log->info("DEBUG: hostprocs: $debugvar");
+      undef $debugvar;
+
 ### host振り分けの方法とアカウント選択方法の検討中
 # メモリー使用量がネックなので、80プロセスで上限を設定する。ラウンドロビンにするか。。。
 # Roundgetでラウンドロビンを行う
 # $gcount を2種類実行する。
 
-    if ( $#hostlist == $#drophost ) {
-        $self->app->log->info("NOT EXEC PROCS host server");
-        return;
-       }
+   my @hosts; #drophostとhostlistの差分
+   foreach my $po (@hostlist){
+               push(@hosts,$po) unless grep { $_ =~ $po } @drophost;
+           } 
+
+   if ( $hosts[0] eq "" ) { return; }    # @hostsが０ならパス
 
    my $ua = Mojo::UserAgent->new;
-   my $hostget = Roundget->new(@hostlist);
+   my $hostget = Roundget->new(@hosts);
 
    #$gcount数だけ、実行を始める
    for ( my $count=0 ; $count < $gcount; $count++){
@@ -452,6 +471,9 @@ sub controll {
            } #if
        } # foreach
    }  #for
+
+   undef @hosts;
+   undef @drophost;
 
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
