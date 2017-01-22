@@ -223,7 +223,7 @@ sub controll {
   my $glist_tmp = $self->app->config->{glist};
   my $glist = $glist_tmp;
   my $sglist_tmp = $self->app->config->{sglist};
-  my $sglist = $glist_tmp;
+  my $sglist = $sglist_tmp;
 
 # hostlist たぶん30個が限界　event emitterで時間切れが起きる
   my $hostlist_tmp = $self->app->config->{hostlist}; #configに書けるのはハッシュのみなので、ステップを置いて配列に置き換える
