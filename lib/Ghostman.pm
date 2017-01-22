@@ -20,6 +20,9 @@ sub startup {
   # Documentation browser under "/perldoc"
   $self->plugin('PODRenderer');
 
+  # config read
+  $self->plugin('Config');
+
   # Router
   my $r = $self->routes;
 

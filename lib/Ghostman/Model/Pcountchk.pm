@@ -29,7 +29,7 @@ sub check {
 
   if (my $resp = $tx->success) {
           $self->{flag} = "true";
-          $self->{result} = $resp->body;
+          $self->{result} = from_json($resp->body);
           return 0;
      }
    else {
