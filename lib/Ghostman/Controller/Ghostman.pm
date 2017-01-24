@@ -341,9 +341,9 @@ sub controll {
                                               $self->app->log->info("DEBUG: $i->{email} EXIST");
                                               }
                 } #for
-            } #if searchnpc
+              } # if $j
           } #foreach @haccs
-      } #foreach @hostlist
+      } #foreach @hosts
 
       my $debugvar = to_json($hostprocs);
       $self->app->log->info("DEBUG: hostprocs: $debugvar");
@@ -397,6 +397,8 @@ sub controll {
    undef @hosts;
    undef @drophost;
 
+   undef $glist;
+   undef $sglist;
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
    $self->render(msg => 'dummy page');
