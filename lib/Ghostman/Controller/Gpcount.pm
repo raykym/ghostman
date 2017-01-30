@@ -14,14 +14,14 @@ sub pcount {
     foreach my $p (@{$proceslist->table}){
         my $line = $p->cmndline;
 
-        if ( $line =~ /npcuser/){
+        if (( $line =~ /npcuser/)&&( $line !~ /systemd-run/)){
             my @pname = split(/ /,$line);
 
                 push ( @doaccount, $pname[2] ); 
 
             } # if $line npcuser
 
-        if ( $line =~ /searchnpc/){
+        if (( $line =~ /searchnpc/)&&( $line !~ /systemd-run/)){
             my @pname = split(/ /,$line);
 
                 push ( @doaccount, $pname[2] ); 

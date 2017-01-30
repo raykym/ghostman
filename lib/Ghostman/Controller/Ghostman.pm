@@ -210,7 +210,7 @@ sub put {
 sub controll {
   my $self = shift;
   # 負荷分散用、スケール可能な形に処理を分割した
-  # アカウントリストとホストリストは外出しするべきかもしれない
+  # アカウントリストとホストリストは外出し
 
   my $gcount = $self->param('c'); # ghost数
      if (! defined $gcount) { return; }
@@ -225,7 +225,7 @@ sub controll {
   my $sglist_tmp = $self->app->config->{sglist};
   my $sglist = $sglist_tmp;
 
-# hostlist たぶん30個が限界　event emitterで時間切れが起きる
+# hostlist たぶん30個が限界　event emitterで時間切れが起きる チェックエラーが起きる場合も2重起動を引き起こす
   my $hostlist_tmp = $self->app->config->{hostlist}; #configに書けるのはハッシュのみなので、ステップを置いて配列に置き換える
   my @hostlist = @$hostlist_tmp;
   undef $hostlist_tmp;
@@ -286,7 +286,7 @@ sub controll {
   undef @pcountlist;
 
   # プロセス数の上限とサーバ個別上限の確認
-    my $proclimit = 80; #1サーバ当たり80プロセスが上限とする（standard　3.75GB）
+    my $proclimit = 70; #1サーバ当たり70プロセスが上限とする（standard　3.75GB）
     my $allprocs = 0;
     for (my $j=0; $j <= $#pcountres; $j++){
         my $i = $pcountres[$j]->{acclist};
@@ -296,7 +296,7 @@ sub controll {
            $self->app->log->info("DEBUG: acclist $j | count: $#ii ");
 
            # 上限に達しているサーバをリストする
-           if ( $#ii >= 79 ) {
+           if ( $#ii >= ($proclimit -1) ) {
               push (@drophost, $hostlist[$j]); 
               $self->app->log->info("DROP hostlist: $hostlist[$j] ");
               }

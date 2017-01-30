@@ -20,7 +20,7 @@ sub ghostexec {
 
   my $mode = "random";
 
-  system("/home/debian/perlwork/work/Walkworld/$targetname\.pl $account $accpass $chg_lat $chg_lng $mode > /dev/null 2>&1 & ");
+  system("sudo systemd-run --scope -p MemoryLimit=130M --uid=1001 /home/debian/perlwork/work/Walkworld/$targetname\.pl $account $accpass $chg_lat $chg_lng $mode > /dev/null 2>&1 & ");
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
    $self->render(msg => 'dummy page');
