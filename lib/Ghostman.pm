@@ -10,7 +10,8 @@ sub startup {
      
   # hypnotoad start
   $self->config(hypnotoad=>{
-                       listen => ['https://*:3000?cert=/etc/letsencrypt/live/instance-1.backbone.site/fullchain.pem&key=/etc/letsencrypt/live/instance-1.backbone.site/privkey.pem'],
+                    #   listen => ['https://*:3000?cert=/etc/letsencrypt/live/instance-1.backbone.site/fullchain.pem&key=/etc/letsencrypt/live/instance-1.backbone.site/privkey.pem'],
+                       listen => ['http://*:3000'],
                        accepts => 10,
                        clients => 1,
                        workers => 1,
