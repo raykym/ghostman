@@ -6,11 +6,13 @@ use Mojo::Base 'Mojolicious::Controller';
 use Proc::ProcessTable;
 use Mojo::JSON qw(encode_json decode_json from_json to_json);
 use Mojo::UserAgent;
+use Mojo::Redis2;
 
 # 独自パスを指定して自前モジュールを利用
 use lib '/home/debian/perlwork/mojowork/server/ghostman/lib/Ghostman/Model';
 use Pcountchk;
 use Roundget;
+use Sessionid;
 
 # This action will render a template
 sub put {
@@ -245,7 +247,7 @@ sub controll {
     my $tx = $ua->get("http://$host");     
        if (! $tx->success) {
            push( @drophost , $host);
-           $self->app->log->info("DEBUG: host check: $host DROPed.....");
+           $self->app->log->debug("DEBUG: host check: $host DROPed.....");
           }
     }
 
@@ -264,7 +266,7 @@ sub controll {
              my $res = $instance->result;
              my $res_j = to_json($res);
              push (@pcountres, $res);
-             $self->app->log->info("DEBUG: pcount(true): $res_j" );
+             $self->app->log->debug("DEBUG: pcount(true): $res_j" );
          } else {
              #retry
              my $ret = $instance->check;
@@ -272,13 +274,13 @@ sub controll {
                  my $res = $instance->resilt;
                  my $res_j = to_json($res);
                  push (@pcountres, $res);
-                 $self->app->log->info("DEBUG: pcount2(true): $res_j" );
+                 $self->app->log->debug("DEBUG: pcount2(true): $res_j" );
              } else {
                  my $res = $instance->result;
                  my $res_j = to_json($res);    # 空白80個で強制的にdropさせる
                  my $dumdata = {"acclist" => ["","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",""] };
                  push (@pcountres, $dumdata);
-                 $self->app->log->info("DEBUG: pcount2(error): $res_j" );
+                 $self->app->log->debug("DEBUG: pcount2(error): $res_j" );
              } #flag2
          } # flag1
   } #foreach
@@ -293,23 +295,23 @@ sub controll {
            my @ii = @$i;
            $allprocs = $allprocs + $#ii + 1;
 
-           $self->app->log->info("DEBUG: acclist $j | count: $#ii ");
+           $self->app->log->debug("DEBUG: acclist $j | count: $#ii ");
 
            # 上限に達しているサーバをリストする
            if ( $#ii >= ($proclimit -1) ) {
               push (@drophost, $hostlist[$j]); 
-              $self->app->log->info("DROP hostlist: $hostlist[$j] ");
+              $self->app->log->debug("DROP hostlist: $hostlist[$j] ");
               }
     } # for
 
-    $self->app->log->info("DEBUG: allprocs: $allprocs ");
+    $self->app->log->debug("DEBUG: allprocs: $allprocs ");
 
     my $limitcount = $proclimit * ($#hosts + 1 );
 
-    $self->app->log->info("DEBUG: limitcount: $limitcount ");
+    $self->app->log->debug("DEBUG: limitcount: $limitcount ");
 
     if ( $limitcount < $allprocs) {
-           $self->app->log->info("allprocs: $allprocs  NOT EXEC NPC.........");
+           $self->app->log->debug("allprocs: $allprocs  NOT EXEC NPC.........");
            return;  # 上限を超えてプロセスは起動させない
         }
 
@@ -329,7 +331,7 @@ sub controll {
               for my $i (@$glist){
                   if ( $j eq $i->{email}) {
                                               $i->{run} = "exist";
-                                              $self->app->log->info("DEBUG: $i->{email} EXIST");
+                                              $self->app->log->debug("DEBUG: $i->{email} EXIST");
                                               }
                 } #for
              } #if npcuser
@@ -338,7 +340,7 @@ sub controll {
               for my $i (@$sglist){
                   if ( $j eq $i->{email}) {
                                               $i->{run} = "exist";
-                                              $self->app->log->info("DEBUG: $i->{email} EXIST");
+                                              $self->app->log->debug("DEBUG: $i->{email} EXIST");
                                               }
                 } #for
               } # if $j
@@ -346,7 +348,7 @@ sub controll {
       } #foreach @hosts
 
       my $debugvar = to_json($hostprocs);
-      $self->app->log->info("DEBUG: hostprocs: $debugvar");
+      $self->app->log->debug("DEBUG: hostprocs: $debugvar");
       undef $debugvar;
       undef $hostprocs;
 
@@ -404,5 +406,165 @@ sub controll {
    $self->render(msg => 'dummy page');
 }
 
+sub gaccput {
+    my $self = shift;
+    
+    # 稼働中のアカウントをチェックして、割り振るだけ、終了はコプロで処理される
+
+  my $gcount = $self->param('c'); # ghost数
+     if (! defined $gcount) { return; }
+  my $lat = $self->param('lat');
+     if ( ! defined $lat) { return; }
+  my $lng = $self->param('lng');
+     if ( ! defined $lng) { return; }
+
+  my $redis ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
+  my $ua = Mojo::UserAgent->new;
+
+  #稼働中はリストが保持される前提
+  my $gacclist = $self->app->config->{ghostacc};
+
+    # useridを割り振る起動中は基本的にこのままの値になる
+    foreach my $acc (@$gacclist){
+          $acc->{userid} = Sessionid->new($acc->{email})->uid if ($acc->{userid} eq "");
+    }
+    
+  # Pcountchkにgacccheckを追加した 現時点では単独サーバでの利用のみ想定
+  # sidのリストが戻る
+  my $host = "10.140.0.2:3010";
+  my $pcountchk = Pcountchk->new($host);  
+     $pcountchk->gacccheck; 
+  my $res = $pcountchk->result; # $res->{proclist}に配列でsidが入っている
+  my @proclist = @{$res->{proclist}};
+
+  # 実行中アカウントのチェック gacclistにrun=existをチェックする
+  my @coprolist = ();   # 実行中のアカウント情報の配列の配列 proclistに位置が同じはず配列だから
+  my @coprocount = ();  # @coprolistに合わせてカウントする
+
+  $self->app->log->debug("DEBUG: proclist: $#proclist");
+
+  if ($#proclist != -1){  # 空配列ならパス
+     for my $i (@proclist){
+         my $pacclist = $redis->get("GACC$i");
+            $pacclist = from_json($pacclist) if ($pacclist ne "nil");
+         push(@coprolist,$pacclist); #実行中アカウント情報の配列を取得
+         undef $pacclist;
+         }
+
+      for my $i (@$gacclist){
+          $i->{run} = "";  #初期化する。祓われたアカウントをクリアするため
+         }
+     #gacclistの稼働中チェック 稼働数のカウント
+      for my $i (@coprolist){
+             my @pcount;  # ARRAYリファレンスではない場合、空白配列のまま
+             if (ref($i) eq 'ARRAY') { 
+                 @pcount = @$i; 
+                }   
+             push(@coprocount,$#pcount); # 配列番号(個数-1)または空(-1)に成っている         
+             undef @pcount;
+          for my $j (@$gacclist){
+              if ( grep { $_->{email} eq $j->{email} } @$i) {  #稼働中のアカウントリストを初期リストに突き合せて、稼働中フラグを立てる
+                  $j->{run} = "exist";
+                  $self->app->log->info("DEBUG check: $j->{name} $j->{run}");
+                 } 
+          } #j
+      }#i
+  } # if @proclist ここまでバイパスする
+
+my $sid;
+
+  if (!@proclist){
+     #子プロセスが無いので準備する。
+     $sid = Sessionid->new->sid;
+     $ua->post("http://$host/gaccexec" => form => { sid => $sid });
+     $self->app->log->debug("DEBUG: procexec: $sid");
+     push(@proclist,$sid);
+     push(@coprolist,[]);
+     push(@coprocount,0);
+  }
+
+  # 子プロセスに受け入れる容量が在るのか？確認するには
+  my $chkcount;
+  for my $i (@coprocount){
+       my $j = $i + 1;  # 配列の添字に+1
+       $chkcount = $chkcount + ( 10 - $j);  # 空き数
+  } 
+  if ( $chkcount < $gcount ) {
+     #子プロセスの空きが要求個数に満たない場合、子プロセスを追加
+     $sid = Sessionid->new->sid;
+     $ua->post("http://$host/gaccexec" => form => { sid => $sid });
+     $self->app->log->debug("DEBUG: 2 procexec: $sid");
+     push(@proclist,$sid);
+     push(@coprolist,[]);
+     push(@coprocount,0);
+  }
+  undef $chkcount;
+
+  for (my $i=0; $i<$gcount; $i++){
+      for (my $j=0; $j<=$#coprolist; $j++) {
+             $self->app->log->debug("DEBUG: coprocount: $coprocount[$j]");
+          if ( $coprocount[$j] >= 9 ){ #1プロセス当たり10個の上限
+               next; # $j up   coprolistを先に進める
+              } 
+
+          $self->app->log->debug("DEBUG: coprolist[$j]: $coprolist[$j]");
+
+          for my $k(@$gacclist){
+              if ($k->{run} ne "exist"){
+                # uidは上で設定済 
+                 $k->{run} = "exist";
+                 $lat = $lat + rand(0.01) - rand(0.01);                 
+                 $lng = $lng + rand(0.01) - rand(0.01);
+
+                 $k->{loc}->{lat} = $lat;
+                 $k->{loc}->{lng} = $lng;
+                 $k->{geometry}->{coordinates}  = [ $lng , $lat ];
+
+                 my $debug = to_json($k);
+                 $self->app->log->debug("DEBUG: gacc: $debug");
+                 undef $debug;
+                 push( @{$coprolist[$j]}, $k);
+    #             $debug = to_json($coprolist[$j]);
+    #     $self->app->log->debug("DEBUG: coprolist[$j]: $debug");
+    #             undef $debug;
+                 last; # 1回処理するとループを抜ける
+                 }
+             }
+            last; # 内側ループが処理すると抜ける
+          } #$j
+    } #$i
+
+    #redisに書き戻す proclistからsid coprolistでアカウント情報
+    for (my $i=0; $i<=$#proclist; $i++) {
+        my $accdata = to_json($coprolist[$i]);
+        $redis->set("GACC$proclist[$i]" => $accdata );
+        $redis->expire("GACC$proclist[$i]" => 12 );
+        undef $accdata;
+        $self->app->log->debug("DEBUG: redis set: GACC$proclist[$i]");
+    }
+
+    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+    $self->render(msg => 'dummy page');
+
+}
+
+sub gacclist {
+    my $self = shift;
+  # 子プロセスからアクセスを受けて、sid毎にアカウントリストを表示する。
+  # redisに登録されたリストを返すのみ
+
+    my $sid = $self->param('sid');
+
+    my $redis = $self->app->redis;
+
+    my @list =  $redis->get("GACC$sid");
+
+    my $sendlist = { "acclist" => \@list };
+
+
+    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+    $self->render(json => $sendlist);
+
+}
 
 1;

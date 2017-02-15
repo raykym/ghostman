@@ -19,6 +19,7 @@ sub new {
   return bless {string => $arg,flag => $flag,result => \@result},$class;
 }
 
+# ghostmang用
 sub check {
   my $self = shift;
   # $self->{strings}にアドレスが入っている
@@ -41,6 +42,30 @@ sub check {
    } # if 
 
 } #check
+
+# gacclist用
+sub gacccheck {
+  my $self = shift;
+  # $self->{strings}にアドレスが入っている
+  my $host = $self->{string};
+
+  my $ua = Mojo::UserAgent->new; 
+  my $tx = $ua->get("http://$host/gaccpcount");   # local対応想定なのでhttpで。。。
+
+  if (my $resp = $tx->success) {
+          $self->{flag} = "true";
+          $self->{result} = from_json($resp->body);
+          return 0;
+     }
+   else {
+      my $err = $tx->error;
+         $self->{flag} = "false";
+    #  die "$err->{code} responce: $err->{message}" if $err->{code};
+    #  die "Connection error: $err->{message}";
+         return 1;
+   } # if 
+
+} #gacccheck
 
 sub result {
  my $self = shift;
