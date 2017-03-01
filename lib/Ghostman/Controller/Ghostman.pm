@@ -233,7 +233,7 @@ sub controll {
   undef $hostlist_tmp;
 
 #  my @hostlist = ( 
-#                   "10.140.0.2:3010",
+#                   "10.140.0.2:3000",
 #                   "10.140.0.5:3000",
 #                 );
 
@@ -431,7 +431,7 @@ sub gaccput {
     
   # Pcountchkにgacccheckを追加した 現時点では単独サーバでの利用のみ想定
   # sidのリストが戻る
-  my $host = "10.140.0.2:3010";
+  my $host = "10.140.0.2:3000";
   my $pcountchk = Pcountchk->new($host);  
      $pcountchk->gacccheck; 
   my $res = $pcountchk->result; # $res->{proclist}に配列でsidが入っている
@@ -441,7 +441,7 @@ sub gaccput {
   my @coprolist = ();   # 実行中のアカウント情報の配列の配列 proclistに位置が同じはず配列だから
   my @coprocount = ();  # @coprolistに合わせてカウントする
 
-  $self->app->log->debug("DEBUG: proclist: $#proclist");
+  $self->app->log-> info("DEBUG: proclist: $#proclist");
 
   if ($#proclist != -1){  # 空配列ならパス
      for my $i (@proclist){
@@ -551,7 +551,7 @@ my $sid;
 sub gacclist {
     my $self = shift;
   # 子プロセスからアクセスを受けて、sid毎にアカウントリストを表示する。
-  # redisに登録されたリストを返すのみ
+  # redisに登録されたリストを返すのみ ->プロセスは直接redisへアクセスするので未使用
 
     my $sid = $self->param('sid');
 
