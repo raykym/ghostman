@@ -521,7 +521,7 @@ my $sid;
                  $k->{geometry}->{coordinates}  = [ $lng , $lat ];
 
                  my $debug = to_json($k);
-                 $self->app->log->debug("DEBUG: gacc: $debug");
+                 $self->app->log->info("DEBUG: gacc: ADD: $debug");
                  undef $debug;
                  push( @{$coprolist[$j]}, $k);
     #             $debug = to_json($coprolist[$j]);
