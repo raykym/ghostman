@@ -445,11 +445,18 @@ sub gaccput {
 
   if ($#proclist != -1){  # 空配列ならパス
      for my $i (@proclist){
-         my $pacclist = $redis->get("GACC$i");
+          my $pacclist;
+            $pacclist = $redis->get("GACC$i");
             $pacclist = from_json($pacclist) if ($pacclist ne "nil");
          push(@coprolist,$pacclist); #実行中アカウント情報の配列を取得
          undef $pacclist;
          }
+
+  if ($#proclist >= 30){ # 30プロセスでリミットを設定しておく　スケールアップかスケールアウトか、方針が決まっていないけど、、、
+    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+    $self->render(msg => 'limit over');
+    return;
+    }
 
       for my $i (@$gacclist){
           $i->{run} = "";  #初期化する。祓われたアカウントをクリアするため
@@ -477,7 +484,7 @@ my $sid;
      #子プロセスが無いので準備する。
      $sid = Sessionid->new->sid;
      $ua->post("http://$host/gaccexec" => form => { sid => $sid });
-     $self->app->log->debug("DEBUG: procexec: $sid");
+     $self->app->log->info("DEBUG: procexec: $sid");
      push(@proclist,$sid);
      push(@coprolist,[]);
      push(@coprocount,0);
@@ -487,13 +494,13 @@ my $sid;
   my $chkcount;
   for my $i (@coprocount){
        my $j = $i + 1;  # 配列の添字に+1
-       $chkcount = $chkcount + ( 10 - $j);  # 空き数
+       $chkcount = $chkcount + ( 20 - $j);  # 空き数チェック　上限を20に想定
   } 
   if ( $chkcount < $gcount ) {
      #子プロセスの空きが要求個数に満たない場合、子プロセスを追加
      $sid = Sessionid->new->sid;
      $ua->post("http://$host/gaccexec" => form => { sid => $sid });
-     $self->app->log->debug("DEBUG: 2 procexec: $sid");
+     $self->app->log->info("DEBUG: 2 procexec: $sid");
      push(@proclist,$sid);
      push(@coprolist,[]);
      push(@coprocount,0);
@@ -503,7 +510,7 @@ my $sid;
   for (my $i=0; $i<$gcount; $i++){
       for (my $j=0; $j<=$#coprolist; $j++) {
              $self->app->log->debug("DEBUG: coprocount: $coprocount[$j]");
-          if ( $coprocount[$j] >= 9 ){ #1プロセス当たり10個の上限
+          if ( $coprocount[$j] >= 19 ){ #1プロセス当たり20個の上限
                next; # $j up   coprolistを先に進める
               } 
 
@@ -538,7 +545,7 @@ my $sid;
     for (my $i=0; $i<=$#proclist; $i++) {
         my $accdata = to_json($coprolist[$i]);
         $redis->set("GACC$proclist[$i]" => $accdata );
-        $redis->expire("GACC$proclist[$i]" => 12 );
+        $redis->expire("GACC$proclist[$i]" => 32 );
         undef $accdata;
         $self->app->log->debug("DEBUG: redis set: GACC$proclist[$i]");
     }

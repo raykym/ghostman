@@ -14,13 +14,16 @@ use Pcountchk;
 my $instance = Pcountchk->new("10.140.0.2:3000");
 
 my $str = $instance->string;
-say $str;
+say "string: $str";
 
 my $check = $instance->check;
-say $check;
+say "check: $check";
+
+my $gacccheck = $instance->gacccheck;
+say "gacccheck: $gacccheck";
 
 my $flag = $instance->flag;
-say $flag;
+say "flag: $flag";
 
 my $text = to_json($instance->result);
 

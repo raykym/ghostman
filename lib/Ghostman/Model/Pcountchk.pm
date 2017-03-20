@@ -6,6 +6,7 @@ use utf8;
 use Encode;
 use Mojo::UserAgent;
 use Mojo::JSON qw(to_json from_json);
+use AnyEvent;
 
 # ホスト名かIPアドレスを引数で受けて、ghostmanのpcountからリストを受け取る
 # リトライ、タイムアウトへの対処
@@ -60,6 +61,7 @@ sub gacccheck {
    else {
       my $err = $tx->error;
          $self->{flag} = "false";
+         $self->{result} = [];
     #  die "$err->{code} responce: $err->{message}" if $err->{code};
     #  die "Connection error: $err->{message}";
          return 1;
@@ -69,9 +71,25 @@ sub gacccheck {
 
 sub result {
  my $self = shift;
-   # null or hash...
+   # 応答待ち処理を加える
+   # hashまたは空リファレンス
    # 戻りはperl形式
-  return $self->{result};
+
+   my $cv = AnyEvent->condvar;
+
+   my $t = AnyEvent->timer(
+    after => 0,
+    interval => 1,
+    cb => sub {
+         if ($self->{flag} eq "true"){ 
+              $cv->send;
+          } elsif ($self->{flag} eq "false"){
+              $cv->send; 
+          }
+        }
+    );
+    $cv->recv;
+    return $self->{result};
 }
 
 sub flag {
