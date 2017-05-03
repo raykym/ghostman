@@ -447,8 +447,8 @@ sub gaccput {
      for my $i (@proclist){
           my $pacclist;
             $pacclist = $redis->get("GACC$i");
-            $pacclist = from_json($pacclist) if ($pacclist ne "nil");
-         push(@coprolist,$pacclist); #実行中アカウント情報の配列を取得
+            $pacclist = from_json($pacclist) if ( defined $pacclist);
+         push(@coprolist,$pacclist) if ( defined $pacclist); #実行中アカウント情報の配列を取得
          undef $pacclist;
          }
 

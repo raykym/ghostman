@@ -6,6 +6,7 @@ use utf8;
 use Encode;
 use Mojo::UserAgent;
 use Mojo::JSON qw(to_json from_json);
+use EV;
 use AnyEvent;
 
 # ホスト名かIPアドレスを引数で受けて、ghostmanのpcountからリストを受け取る
