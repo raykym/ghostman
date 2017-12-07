@@ -5,6 +5,9 @@ use Mojo::Redis2;
 #use Ghostman::Model;
 #has 'model' => sub { Ghostman::Model->new };
 
+use lib '/home/debian/perlwork/mojowork/server/ghostman/lib/Ghostman/Model';
+use Gacclistobj;
+
 # This method will run once at server start
 sub startup {
   my $self = shift;
@@ -16,7 +19,7 @@ sub startup {
                        accepts => 10,
                        clients => 1,
                        workers => 3,
-                       proxy => 0,
+                       proxy => 1,
                        });
 
    # $self->app->redis
@@ -30,6 +33,17 @@ sub startup {
 
   # config read
   $self->plugin('Config');
+
+#  #稼働中はリストが保持される前提  useridを一意にするため
+  my $gacclist = $self->app->config->{ghostacc};
+#  # useridを割り振る
+#    foreach my $acc (@$gacclist){
+#          if ($acc->{userid} eq ""){
+#              $acc->{userid} = Sessionid->new($acc->{email})->uid;
+#              $self->app->log->info("DEBUG: set $acc->{email}");
+#          } #if
+#    }
+  $self->app->helper( ghostlist => sub { state $ghostlist = Gacclistobj->new($gacclist) });
 
   # Router
   my $r = $self->routes;

@@ -418,16 +418,23 @@ sub gaccput {
   my $lng = $self->param('lng');
      if ( ! defined $lng) { return; }
 
-  my $redis ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
+  $self->app->log->info("DEBUG: gaccput on message: $gcount $lat $lng");
+
+#  my $redis ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
+  my $redis ||= Mojo::Redis2->new(url => 'redis://westwind:6379');
   my $ua = Mojo::UserAgent->new;
 
-  #稼働中はリストが保持される前提
-  my $gacclist = $self->app->config->{ghostacc};
-
-    # useridを割り振る起動中は基本的にこのままの値になる
-    foreach my $acc (@$gacclist){
-          $acc->{userid} = Sessionid->new($acc->{email})->uid if ($acc->{userid} eq "");
-    }
+#  #稼働中はリストが保持される前提   startに移動 Gacclistobj.pmに変更　helper->ghostlist
+#  my $gacclist = $self->app->config->{ghostacc};
+#
+#    # useridを割り振る
+#    foreach my $acc (@$gacclist){
+#          if ($acc->{userid} eq ""){
+#              $acc->{userid} = Sessionid->new($acc->{email})->uid;
+#              $self->app->log->info("DEBUG: set $acc->{email}");
+#          } #if
+#    }
+  my $gacclist = $self->app->ghostlist->result;;
     
   # Pcountchkにgacccheckを追加した 現時点では単独サーバでの利用のみ想定
   # sidのリストが戻る
@@ -453,7 +460,7 @@ sub gaccput {
          }
 
   if ($#proclist >= 30){ # 30プロセスでリミットを設定しておく　スケールアップかスケールアウトか、方針が決まっていないけど、、、
-    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
     $self->render(msg => 'limit over');
     return;
     }
@@ -476,6 +483,7 @@ sub gaccput {
                  } 
           } #j
       }#i
+    $self->app->log->info("DEBUG: Check END!!");
   } # if @proclist ここまでバイパスする
 
 my $sid;
@@ -494,7 +502,7 @@ my $sid;
   my $chkcount;
   for my $i (@coprocount){
        my $j = $i + 1;  # 配列の添字に+1
-       $chkcount = $chkcount + ( 20 - $j);  # 空き数チェック　上限を20に想定
+       $chkcount = $chkcount + ( 300 - $j);  # 空き数チェック　上限を20に想定
   } 
   if ( $chkcount < $gcount ) {
      #子プロセスの空きが要求個数に満たない場合、子プロセスを追加
@@ -509,12 +517,12 @@ my $sid;
 
   for (my $i=0; $i<$gcount; $i++){
       for (my $j=0; $j<=$#coprolist; $j++) {
-             $self->app->log->debug("DEBUG: coprocount: $coprocount[$j]");
-          if ( $coprocount[$j] >= 19 ){ #1プロセス当たり20個の上限
+             $self->app->log->info("DEBUG: coprocount: $coprocount[$j]");
+          if ( $coprocount[$j] >= 299 ){ #1プロセス当たり200個の上限
                next; # $j up   coprolistを先に進める
               } 
 
-          $self->app->log->debug("DEBUG: coprolist[$j]: $coprolist[$j]");
+       #   $self->app->log->info("DEBUG: coprolist[$j]: $coprolist[$j]");
 
           for my $k(@$gacclist){
               if ($k->{run} ne "exist"){
@@ -531,6 +539,14 @@ my $sid;
                  $self->app->log->info("DEBUG: gacc: ADD: $debug");
                  undef $debug;
                  push( @{$coprolist[$j]}, $k);
+
+        # redis書き込みもここで
+        my $accdata = to_json($coprolist[$j]);
+        $redis->set("GACC$proclist[$j]" => $accdata );
+        $redis->expire("GACC$proclist[$j]" => 32 );
+        undef $accdata;
+        $self->app->log->info("DEBUG: redis set: GACC$proclist[$j]");
+
     #             $debug = to_json($coprolist[$j]);
     #     $self->app->log->debug("DEBUG: coprolist[$j]: $debug");
     #             undef $debug;
@@ -541,17 +557,21 @@ my $sid;
           } #$j
     } #$i
 
-    #redisに書き戻す proclistからsid coprolistでアカウント情報
-    for (my $i=0; $i<=$#proclist; $i++) {
-        my $accdata = to_json($coprolist[$i]);
-        $redis->set("GACC$proclist[$i]" => $accdata );
-        $redis->expire("GACC$proclist[$i]" => 32 );
-        undef $accdata;
-        $self->app->log->debug("DEBUG: redis set: GACC$proclist[$i]");
-    }
+#    #redisに書き戻す proclistからsid coprolistでアカウント情報
+#    for (my $i=0; $i<=$#proclist; $i++) {
+#        my $accdata = to_json($coprolist[$i]);
+#        $redis->set("GACC$proclist[$i]" => $accdata );
+#        $redis->expire("GACC$proclist[$i]" => 32 );
+#        undef $accdata;
+#        $self->app->log->info("DEBUG: redis set: GACC$proclist[$i]");
+#    }
 
     $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
     $self->render(msg => 'dummy page');
+
+  undef @proclist;
+  undef @coprolist;
+  undef @coprocount;
 
 }
 
@@ -562,7 +582,8 @@ sub gacclist {
 
     my $sid = $self->param('sid');
 
-    my $redis = $self->app->redis;
+#    my $redis = $self->app->redis;
+    my $redis ||= Mojo::Redis2->new(url => 'redis://westwind:6379');
 
     my @list =  $redis->get("GACC$sid");
 
@@ -571,6 +592,9 @@ sub gacclist {
 
     $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
     $self->render(json => $sendlist);
+
+    undef $sendlist;
+    undef @list;
 
 }
 

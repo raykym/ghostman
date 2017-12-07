@@ -45,7 +45,7 @@ sub gaccpcount {
     foreach my $p (@{$proceslist->table}){
         my $line = $p->cmndline;
 
-        if ($line =~ /npcuser_n_sitedb/){
+        if (($line =~ /npcuser_n_sitedb/) && (( $line !~ /vi/) || ( $line !~ /view/))){
              my @pname = split(/ /,$line);
 
                 push ( @sidcount, $pname[2] );
@@ -57,6 +57,13 @@ sub gaccpcount {
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
    $self->render(json => $sidlist);
+
+   $self->app->log->info("DEBUG: gaccpcount: $#sidcount ");
+
+   undef $sidlist;
+   undef @sidcount;
+   undef $proceslist;
+
 }
 
 1;
