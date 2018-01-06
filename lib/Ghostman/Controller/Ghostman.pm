@@ -502,7 +502,7 @@ my $sid;
   my $chkcount;
   for my $i (@coprocount){
        my $j = $i + 1;  # 配列の添字に+1
-       $chkcount = $chkcount + ( 300 - $j);  # 空き数チェック　上限を20に想定
+       $chkcount = $chkcount + ( 200 - $j);  # 空き数チェック　上限を200に想定
   } 
   if ( $chkcount < $gcount ) {
      #子プロセスの空きが要求個数に満たない場合、子プロセスを追加
@@ -518,7 +518,7 @@ my $sid;
   for (my $i=0; $i<$gcount; $i++){
       for (my $j=0; $j<=$#coprolist; $j++) {
              $self->app->log->info("DEBUG: coprocount: $coprocount[$j]");
-          if ( $coprocount[$j] >= 299 ){ #1プロセス当たり200個の上限
+          if ( $coprocount[$j] >= 199 ){ #1プロセス当たり200個の上限
                next; # $j up   coprolistを先に進める
               } 
 
