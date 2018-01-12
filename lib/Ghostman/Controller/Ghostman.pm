@@ -420,8 +420,14 @@ sub gaccput {
 
   $self->app->log->info("DEBUG: gaccput on message: $gcount $lat $lng");
 
+
+  # config read
+  $self->app->plugin('Config');
+
+  my $redisserver = $self->app->config->{redisserver};
+
 #  my $redis ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
-  my $redis ||= Mojo::Redis2->new(url => 'redis://westwind:6379');
+  my $redis ||= Mojo::Redis2->new(url => "redis://$redisserver:6379");
   my $ua = Mojo::UserAgent->new;
 
 #  #稼働中はリストが保持される前提   startに移動 Gacclistobj.pmに変更　helper->ghostlist

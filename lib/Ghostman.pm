@@ -22,17 +22,20 @@ sub startup {
                        proxy => 1,
                        });
 
+  # config read
+  $self->plugin('Config');
+
+  my $redisserver = $self->app->config->{redisserver};
+
    # $self->app->redis
    $self->app->helper( redis =>
          ### sub { shift->stash->{redis} ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
-         sub { state $redis = Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
+         sub { state $redis = Mojo::Redis2->new(url => "redis://$redisserver:6379");
          });
 
   # Documentation browser under "/perldoc"
   $self->plugin('PODRenderer');
 
-  # config read
-  $self->plugin('Config');
 
 #  #稼働中はリストが保持される前提  useridを一意にするため
   my $gacclist = $self->app->config->{ghostacc};
