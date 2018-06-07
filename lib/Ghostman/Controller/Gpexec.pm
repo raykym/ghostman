@@ -33,7 +33,7 @@ sub gaccexec {
      if ( ! defined $sid) { return; }
 
 #     system("/home/debian/perlwork/work/Walkworld/npcuser_n_sitedb.pl $sid & ");
-     system("/home/debian/perlwork/work/Walkworld/npcuser_n_sitedb_w.pl $sid & ");  # westwind
+     system("/home/debian/perlwork/work/Walkworld/npcuser_n_sitedb_w.pl $sid > /dev/null 2>&1 & ");  # westwind
 #     system("sudo systemd-run --scope -p MemoryAccounting=true -p MemoryLimit=175M --uid=1001 /home/debian/perlwork/work/Walkworld/npcuser_n_sitedb.pl $sid > /dev/null 2>&1 & ");
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );

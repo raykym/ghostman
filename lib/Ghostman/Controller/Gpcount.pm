@@ -55,7 +55,7 @@ sub gaccpcount {
 
    my $sidlist = { "proclist" => \@sidcount };
 
-   $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+   $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
    $self->render(json => $sidlist);
 
    $self->app->log->info("DEBUG: gaccpcount: $#sidcount ");

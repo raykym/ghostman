@@ -8,6 +8,9 @@ use Mojo::JSON qw(encode_json decode_json from_json to_json);
 use Mojo::UserAgent;
 use Mojo::Redis2;
 
+use AnyEvent;
+use EV;
+
 # 独自パスを指定して自前モジュールを利用
 use lib '/home/debian/perlwork/mojowork/server/ghostman/lib/Ghostman/Model';
 use Pcountchk;
@@ -406,10 +409,12 @@ sub controll {
    $self->render(msg => 'dummy page');
 }
 
+
 sub gaccput {
     my $self = shift;
-    
+
     # 稼働中のアカウントをチェックして、割り振るだけ、終了はコプロで処理される
+    # ラウンドロビンで振り分け可能とする。受け入れに失敗すると無視されるだけ。再度受け付けて処理されるはず。
 
   my $gcount = $self->param('c'); # ghost数
      if (! defined $gcount) { return; }
@@ -419,7 +424,6 @@ sub gaccput {
      if ( ! defined $lng) { return; }
 
   $self->app->log->info("DEBUG: gaccput on message: $gcount $lat $lng");
-
 
   # config read
   $self->app->plugin('Config');
@@ -442,10 +446,14 @@ sub gaccput {
 #    }
   my $gacclist = $self->app->ghostlist->result;;
     
-  # Pcountchkにgacccheckを追加した 現時点では単独サーバでの利用のみ想定
+  # Pcountchkにgacccheckを追加した
   # sidのリストが戻る
-  my $host = "10.140.0.2:3000";
-  my $pcountchk = Pcountchk->new($host);  
+  # ghostman.confに書き込まれたホストにラウンドで処理を割り当てる
+  my $ghostmanhosts = $self->app->config->{ghostmanhosts};
+  my $roundget = Roundget->new(@$ghostmanhosts);
+  my $host = $roundget->get;
+#  my $host = "10.140.0.2:3000";  # 元の形式
+  my $pcountchk = Pcountchk->new($host);     # AnyEvent::Condvarでエラーが起きる。　10回で終了　空配列が戻る想定
      $pcountchk->gacccheck; 
   my $res = $pcountchk->result; # $res->{proclist}に配列でsidが入っている
   my @proclist = @{$res->{proclist}};
@@ -465,9 +473,10 @@ sub gaccput {
          undef $pacclist;
          }
 
-  if ($#proclist >= 30){ # 30プロセスでリミットを設定しておく　スケールアップかスケールアウトか、方針が決まっていないけど、、、
+  # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
+  if ($#proclist > 5){ # 5プロセスでリミットを設定しておく 6個まで動くがそうしないと止まってしまう　スケールアウトでラウンドロビンさせる
     $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
-    $self->render(msg => 'limit over');
+    $self->render(msg => 'this server limit over');
     return;
     }
 
@@ -485,19 +494,20 @@ sub gaccput {
           for my $j (@$gacclist){
               if ( grep { $_->{email} eq $j->{email} } @$i) {  #稼働中のアカウントリストを初期リストに突き合せて、稼働中フラグを立てる
                   $j->{run} = "exist";
-                  $self->app->log->info("DEBUG check: $j->{name} $j->{run}");
+       #           $self->app->log->info("DEBUG check: $j->{name} $j->{run}");
                  } 
           } #j
       }#i
     $self->app->log->info("DEBUG: Check END!!");
-  } # if @proclist ここまでバイパスする
-
+  }  else {   # if @proclist ここまでバイパスする
+     $self->app->log->info("DEBUG: @proclist is null!");
+  }
 my $sid;
 
   if (!@proclist){
      #子プロセスが無いので準備する。
      $sid = Sessionid->new->sid;
-     $ua->post("http://$host/gaccexec" => form => { sid => $sid });
+     $ua->post("http://$host/gaccexec" => form => { sid => $sid });   # Roundgetでラウンドロビンに振り分けられる
      $self->app->log->info("DEBUG: procexec: $sid");
      push(@proclist,$sid);
      push(@coprolist,[]);
@@ -521,6 +531,8 @@ my $sid;
   }
   undef $chkcount;
 
+  my $gaccon = {};
+
   for (my $i=0; $i<$gcount; $i++){
       for (my $j=0; $j<=$#coprolist; $j++) {
              $self->app->log->info("DEBUG: coprocount: $coprocount[$j]");
@@ -534,31 +546,51 @@ my $sid;
               if ($k->{run} ne "exist"){
                 # uidは上で設定済 
                  $k->{run} = "exist";
-                 $lat = $lat + rand(0.01) - rand(0.01);                 
-                 $lng = $lng + rand(0.01) - rand(0.01);
+                 $lat = $lat + rand(0.005) - rand(0.005); 
+                 $lng = $lng + rand(0.005) - rand(0.005);
 
                  $k->{loc}->{lat} = $lat;
                  $k->{loc}->{lng} = $lng;
                  $k->{geometry}->{coordinates}  = [ $lng , $lat ];
 
-                 my $debug = to_json($k);
-                 $self->app->log->info("DEBUG: gacc: ADD: $debug");
-                 undef $debug;
-                 push( @{$coprolist[$j]}, $k);
+                 my $kjson = to_json($k);
+                 $self->app->log->info("DEBUG: gacc: ADD: $kjson");
+                 push( @{$coprolist[$j]}, $k);   # 従来のGACCに書き戻す用
 
-        # redis書き込みもここで
-        my $accdata = to_json($coprolist[$j]);
-        $redis->set("GACC$proclist[$j]" => $accdata );
-        $redis->expire("GACC$proclist[$j]" => 32 );
-        undef $accdata;
-        $self->app->log->info("DEBUG: redis set: GACC$proclist[$j]");
+                 # GACCon用
+                 push(@{$gaccon->{$proclist[$j]}}, $k);   # ハッシュに配列を加える{ $sid => [ $k ] }
+
+        # redis書き込みもここで GACC
+    #    my $accdata = to_json($coprolist[$j]);
+    #    $redis->set("GACC$proclist[$j]" => $accdata );
+    #    $redis->expire("GACC$proclist[$j]" => 32 );
+    #    undef $accdata;
+    #    $self->app->log->info("DEBUG: redis set: GACC$proclist[$j]");
+
+        # GACCon  多数アカウント一気処理ではここがダメ
+    #    my $beforexist;
+    #       $beforexist = $redis->get("GACCon$proclist[$j]");
+    #    if ( defined $beforexist ) {
+    #       my @tmp_k;
+    #       my $beforeobj = from_json($beforexist);
+    #       push(@tmp_k,$beforexist); 
+    #       push(@tmp_k,$k);
+    #       $kjson = to_json(\@tmp_k);   # 上書き
+    #       undef @tmp_k;
+    #    }
+
+        # 追加用GACCon.....に書き込む
+    #    $redis->set("GACCon$proclist[$j]" => $kjson );
+    #    $redis->expire("GACCon$proclist[$j]" => 10 );
+ 
+        undef $kjson;
 
     #             $debug = to_json($coprolist[$j]);
     #     $self->app->log->debug("DEBUG: coprolist[$j]: $debug");
     #             undef $debug;
                  last; # 1回処理するとループを抜ける
                  }
-             }
+             } #for $k 
             last; # 内側ループが処理すると抜ける
           } #$j
     } #$i
@@ -569,8 +601,16 @@ my $sid;
 #        $redis->set("GACC$proclist[$i]" => $accdata );
 #        $redis->expire("GACC$proclist[$i]" => 32 );
 #        undef $accdata;
-#        $self->app->log->info("DEBUG: redis set: GACC$proclist[$i]");
+#        $self->app->log->info("DEBUG: redis set2: GACC$proclist[$i]");
 #    }
+
+        # 追加用GACCon.....に書き込む
+        foreach my $key (keys %$gaccon){
+            my $gacconjson = to_json(\@{$gaccon->{$key}});
+            $redis->set("GACCon$key" => $gacconjson );
+            $redis->expire("GACCon$key" => 12 );
+            $self->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
+        }
 
     $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
     $self->render(msg => 'dummy page');
@@ -578,6 +618,8 @@ my $sid;
   undef @proclist;
   undef @coprolist;
   undef @coprocount;
+  undef $pcountchk;
+  undef $gaccon;
 
 }
 
@@ -601,7 +643,6 @@ sub gacclist {
 
     undef $sendlist;
     undef @list;
-
 }
 
 1;

@@ -76,20 +76,28 @@ sub result {
    # hashまたは空リファレンス
    # 戻りはperl形式
 
-   my $cv = AnyEvent->condvar;
+ #  my $cv = AnyEvent->condvar;
+   my $cv = AE::cv;
+   my $cnt=0;       # limitter
 
    my $t = AnyEvent->timer(
-    after => 0,
+    after => 0,            
     interval => 1,
     cb => sub {
+         $cnt++;
          if ($self->{flag} eq "true"){ 
               $cv->send;
           } elsif ($self->{flag} eq "false"){
               $cv->send; 
+          } elsif ( $cnt > 3 ) {  # リミッターを設定 3回以上回ったら終了する。 空が戻ってもパスされるだけ。
+            $cv->send;
           }
         }
     );
     $cv->recv;
+  
+    undef $cv;
+
     return $self->{result};
 }
 
