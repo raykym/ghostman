@@ -40,4 +40,24 @@ sub gaccexec {
    $self->render(msg => 'dummy page');
 }
 
+sub gaccexecminion {
+   my $self = shift;
+
+   my $sid = $self->param('sid');
+     if ( ! defined $sid) { return; }
+
+     $self->app->minion->add_task( gaccexec => sub {
+		     my ($job, @args ) = @_;
+		     my $sid = $args[0];
+
+                     system("/home/debian/perlwork/work/Walkworld/npcuser_n_sitedb_w.pl $sid > /dev/null 2>&1 & ");  # westwind
+     });
+
+   $self->app->minion->enqueue( gaccexec => [ $sid ] );
+   $self->app->minion->perform_jobs;
+
+   $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
+   $self->render(text => 'dummy page', status => '200');
+}
+
 1;

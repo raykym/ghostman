@@ -1,6 +1,9 @@
 package Ghostman;
 use Mojo::Base 'Mojolicious';
 use Mojo::Redis2;
+use Mojo::Pg;
+use Minion;
+use Mojolicious::Plugin::Minion;
 
 #use Ghostman::Model;
 #has 'model' => sub { Ghostman::Model->new };
@@ -26,12 +29,21 @@ sub startup {
   $self->plugin('Config');
 
   my $redisserver = $self->app->config->{redisserver};
+  my $postgresserver = $self->app->config->{postgresserver};
 
    # $self->app->redis
    $self->app->helper( redis =>
          ### sub { shift->stash->{redis} ||= Mojo::Redis2->new(url => 'redis://10.140.0.4:6379');
          sub { state $redis = Mojo::Redis2->new(url => "redis://$redisserver:6379");
          });
+
+   # $self->app->pg
+   $self->app->helper ( pg =>
+           sub { state $pg = Mojo::Pg->new( 'postgresql://minion:minionpass@localhost/minion' );
+         });
+
+   $self->plugin( Minion => { Pg => $self->app->pg });
+
 
   # Documentation browser under "/perldoc"
   $self->plugin('PODRenderer');
@@ -62,8 +74,10 @@ sub startup {
 
   # npcuser_n_sitedb.pl展開用
   $r->post('/gaccput')->to(controller => 'ghostman', action => 'gaccput');
+  $r->post('/gaccputminion')->to(controller => 'ghostman', action => 'gaccputminion');  # Minion利用
  # $r->post('/gacclist')->to(controller => 'ghostman', action => 'gacclist'); # 仕様変更廃止
   $r->post('/gaccexec')->to(controller => 'Gpexec', action => 'gaccexec');
+  $r->post('/gaccexecminion')->to(controller => 'Gpexec', action => 'gaccexecminion');
   $r->get('/gaccpcount')->to(controller => 'Gpcount', action => 'gaccpcount');
 
   $r->any('*')->to('Top#unknown'); # 未定義のパスは全てunknown画面へ
