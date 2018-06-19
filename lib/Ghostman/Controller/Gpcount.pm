@@ -45,10 +45,10 @@ sub gaccpcount {
     foreach my $p (@{$proceslist->table}){
         my $line = $p->cmndline;
 
-        if (($line =~ /npcuser_n_sitedb/) && (( $line !~ /vi/) || ( $line !~ /view/))){
+        if ($line =~ /npcuser_n_sitedb/) {
              my @pname = split(/ /,$line);
 
-                push ( @sidcount, $pname[2] );
+                push ( @sidcount, $pname[2] ) if ( defined $pname[2] );
 
             } # if $line npcuser
     }

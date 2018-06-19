@@ -764,7 +764,7 @@ my $sid;
   }
 
   # 子プロセスに受け入れる容量が在るのか？確認するには
-  my $chkcount;
+  my $chkcount = 0;
   for my $i (@coprocount){
        my $j = $i + 1;  # 配列の添字に+1
        $chkcount = $chkcount + ( 200 - $j);  # 空き数チェック　上限を200に想定
@@ -844,7 +844,7 @@ my $sid;
 
     $self->app->minion->enqueue(gaccput => [$gcount, $lat, $lng, $redisserver, $gacclist, $host  ] );
     $self->app->log->info("DEBUG: gcount: $gcount  lat: $lat lng: $lng redisserver: $redisserver gacclist: $gacclist host: $host");
-    #   $self->app->minion->perform_jobs;  # temporary worker need
+    $self->app->minion->perform_jobs;  # temporary worker need
 
 }
 
