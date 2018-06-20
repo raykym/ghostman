@@ -19,33 +19,38 @@ $minion->add_task(gaccput => sub {
 
         my ( $gcount, $lat, $lng, $redisserver, $gacclist, $host  ) = @args;   # 引数を展開
 
+	$| = 1;  # buffer off
+	my $mongoserver = "10.140.0.8";
 
 	use Mojo::JSON qw(from_json to_json);
         use Mojo::Redis2;
         use Mojo::UserAgent;
         use DateTime;
         use Encode qw(encode_utf8 decode_utf8);
+	use MongoDB;
 
         use lib '/home/debian/perlwork/mojowork/server/ghostman/lib/Ghostman/Model';
         use Pcountchk;
         use Sessionid;
 
 
+my $mongoclient = MongoDB->connect("mongodb://$mongoserver:27017");
+my $wwlogdb = $mongoclient->get_database('WalkWorldLOG');
+our $npcuserlog = $wwlogdb->get_collection('npcuserlog');  # Logingdでは無記名sub内でスコープが外れるので、公開指定をする
+
 # 表示用ログフォーマット
-sub Loging{
+sub Loging {
     my $logline = shift;
     my $dt = DateTime->now();
-
        $logline = encode_utf8($logline);
-
     say "$dt | $logline";
-#    $logline = decode_utf8($logline);
-#    my $dblog = { 'ttl' => $dt, 'logline' => $logline, 'email' => $email };    # ログ切り分け用にemailを設定
-#       $npcuserlog->insert_one($dblog);
+    $logline = decode_utf8($logline);
+    my $dblog = { 'ttl' => $dt, 'logline' => $logline, 'email' => "worker" };    # ログ切り分け用にemailを設定
+       $npcuserlog->insert_one($dblog);
 
-#    undef $logline;
+    undef $logline;
     undef $dt;
-#    undef $dblog;
+    undef $dblog;
 
     return;
 }
@@ -72,9 +77,25 @@ sub Loging{
                 my $pacclist;
                    $pacclist = $redis->get("GACC$i");
                    $pacclist = from_json($pacclist) if ( defined $pacclist);
-                push(@coprolist,$pacclist) if ( defined $pacclist); #実行中アカウント情報の配列を取得
+
+		my $pacclist_on;
+                   $pacclist_on = $redis->hvals("GACCon$i");   # 配列にテキストが入っている
+
+		   for my $i (@$pacclist_on){
+		       my $pacclist_one;
+                       $pacclist_one = from_json($i) if ( defined $i);
+                       if ( defined $pacclist_one ){
+                           push(@$pacclist,@$pacclist_one);   # 連想配列に連想配列をつなげる
+			   Loging("list add pacclist");
+		       } 
+		       undef $pacclist_one;
+    	           } # for
+
+                push(@coprolist,$pacclist) if ( defined $pacclist); #実行中アカウント情報の配列を取得 GACConもとりあえず追加する
                 undef $pacclist;
-         }
+		undef $pacclist_on;
+
+         } # for @proclist
 
          # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
          if ($#proclist > 5){ # 5プロセスでリミットを設定しておく 6個まで動くがそうしないと止まってしまう　スケールアウトでラウンドロビンさせる
@@ -184,14 +205,18 @@ sub Loging{
           } #$j
     } #$i
 
+
     # 追加用GACCon.....に書き込む
     foreach my $key (keys %$gaccon){
-        my $gacconjson = to_json(\@{$gaccon->{$key}});
-        $redis->set("GACCon$key" => $gacconjson );
-        $redis->expire("GACCon$key" => 12 );
-	#   $job->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
-       Loging("add gacccon: $key | $gacconjson");
-    }
+
+         my $gacconjson = to_json(\@{$gaccon->{$key}});
+            $redis->hset("GACCon$key" , $gaccon->{$key}->[0]->{email}, $gacconjson );
+            $redis->expire("GACCon$key" => 12 );
+	
+	 #   $job->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
+           Loging("add gacccon: $key | $gaccon->{$key}->[0]->{email} | $gacconjson");
+
+    }  # foreach key
 
     undef @proclist;
     undef @coprolist;
@@ -211,6 +236,7 @@ sub Loging{
                      system("/home/debian/perlwork/work/Walkworld/npcuser_n_sitedb_w.pl $sid > /dev/null 2>&1 & ");  # westwind
 
                      say "GACCEXEC: process exec $sid";
+                     Loging("GACCEXEC: process exec $sid");
      });
 
 

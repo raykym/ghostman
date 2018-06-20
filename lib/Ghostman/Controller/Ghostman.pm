@@ -707,15 +707,30 @@ sub gaccputminion {
   my @coprocount = ();  # @coprolistに合わせてカウントする
 
 #  $self->app->log-> info("DEBUG: proclist: $#proclist");
-  $job->app->log-> info("DEBUG: proclist: $#proclist");
+  $job->app->log->info("DEBUG: proclist: $#proclist");
 
   if ($#proclist != -1){  # 空配列ならパス
      for my $i (@proclist){
           my $pacclist;
             $pacclist = $redis->get("GACC$i");
             $pacclist = from_json($pacclist) if ( defined $pacclist);
+
+         my $pacclist_on;
+            $pacclist_on = $redis->hvals("GACCon$i");   # 配列にテキストが入ってい
+
+                   for my $i (@$pacclist_on){
+                       my $pacclist_one;
+                       $pacclist_one = from_json($i) if ( defined $i);
+                       if ( defined $pacclist_one ){
+                           push(@$pacclist,@$pacclist_one);   # 連想配列に連想配列をつなげる
+                           $job->app->log->info("list add pacclist");
+                       }
+                       undef $pacclist_one;
+                   } # for
+
          push(@coprolist,$pacclist) if ( defined $pacclist); #実行中アカウント情報の配列を取得
          undef $pacclist;
+         undef $pacclist_on;
          }
 
   # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
@@ -828,10 +843,11 @@ my $sid;
         # 追加用GACCon.....に書き込む
         foreach my $key (keys %$gaccon){
             my $gacconjson = to_json(\@{$gaccon->{$key}});
-            $redis->set("GACCon$key" => $gacconjson );
+         #   $redis->set("GACCon$key" => $gacconjson );
+            $redis->hset("GACCon$key" , $gaccon->{$key}->[0]->{email}, $gacconjson );
             $redis->expire("GACCon$key" => 12 );
 	    #  $self->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
-            $job->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
+            $job->app->log->info("DEBUG: add gaccon: $key | $gaccon->{$key}->[0]->{email} | $gacconjson ");
         }
 
   undef @proclist;

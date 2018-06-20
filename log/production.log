@@ -1,4 +1,1 @@
 
-[Tue Jun 19 09:54:21 2018] [info] DEBUG: gaccput on message: 1 35.7429309009553 140.047024942612
-[Tue Jun 19 09:54:22 2018] [info] DEBUG: gcount: 1  lat: 35.7429309009553 lng: 140.047024942612 redisserver: 10.140.0.8 gacclist: ARRAY(0x55ac7b262a60) host: 10.140.0.3:3000
-[Tue Jun 19 09:54:22 2018] [info] DEBUG: gaccpcount: 0 
