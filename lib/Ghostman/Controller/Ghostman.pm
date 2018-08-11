@@ -1,8 +1,6 @@
 package Ghostman::Controller::Ghostman;
 use Mojo::Base 'Mojolicious::Controller';
 
-# morboを前提で作成されているサーバ hypnotoadを１workerで動作させる
-
 use Proc::ProcessTable;
 use Mojo::JSON qw(encode_json decode_json from_json to_json);
 use Mojo::UserAgent;
@@ -735,8 +733,8 @@ sub gaccputminion {
 
   # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
   if ($#proclist > 5){ # 5プロセスでリミットを設定しておく 6個まで動くがそうしないと止まってしまう　スケールアウトでラウンドロビンさせる
-  #  $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
-  #  $self->render(msg => 'this server limit over');
+	  #$self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
+	  #$self->render(msg => 'this server limit over');
     return;
     }
 

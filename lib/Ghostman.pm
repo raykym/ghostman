@@ -11,6 +11,7 @@ use Mojolicious::Plugin::Minion;
 use lib '/home/debian/perlwork/mojowork/server/ghostman/lib/Ghostman/Model';
 use Gacclistobj;
 
+
 # This method will run once at server start
 sub startup {
   my $self = shift;
@@ -73,10 +74,10 @@ sub startup {
   $r->post('/ghostexec')->to(controller => 'Gpexec', action => 'ghostexec');
 
   # npcuser_n_sitedb.pl展開用
-  $r->post('/gaccput')->to(controller => 'ghostman', action => 'gaccput');
+#  $r->post('/gaccput')->to(controller => 'ghostman', action => 'gaccput');
   $r->post('/gaccputminion')->to(controller => 'ghostman', action => 'gaccputminion');  # Minion利用
  # $r->post('/gacclist')->to(controller => 'ghostman', action => 'gacclist'); # 仕様変更廃止
-  $r->post('/gaccexec')->to(controller => 'Gpexec', action => 'gaccexec');
+#  $r->post('/gaccexec')->to(controller => 'Gpexec', action => 'gaccexec');
   $r->post('/gaccexecminion')->to(controller => 'Gpexec', action => 'gaccexecminion');
   $r->get('/gaccpcount')->to(controller => 'Gpcount', action => 'gaccpcount');
 

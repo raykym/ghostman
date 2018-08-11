@@ -1,5 +1,5 @@
 
 
->gaccputworker minion worker > /dev/null 2>&1 &
+>gaccputworker.pl minion worker > /dev/null 2>&1 &
 
 

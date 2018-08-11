@@ -16,7 +16,7 @@ use Data::Dumper;
 my $minion = Minion->new(Pg => 'postgresql://minion:minionpass@localhost/minion');
 
 if (( ! defined $ARGV[0] ) || ( $ARGV[0] eq "")) {
-    say ">gacc-cmd.pl stat | reset ";
+    say ">gacc-cmd.pl stat | reset | tasks | history | repair";
     exit;
 }
 
@@ -47,5 +47,11 @@ if ( $ARGV[0] eq 'tasks' ) {
 if ( $ARGV[0] eq 'history' ) {
    my $history = $minion->history;
    say Dumper $history;
+   exit;
+}
+
+if ( $ARGV[0] eq 'repair' ) {
+   my $history = $minion->repair;
+   say "repair done";
    exit;
 }

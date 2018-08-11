@@ -20,7 +20,7 @@ $minion->add_task(gaccput => sub {
         my ( $gcount, $lat, $lng, $redisserver, $gacclist, $host  ) = @args;   # 引数を展開
 
 	$| = 1;  # buffer off
-	my $mongoserver = "10.140.0.8";
+	my $mongoserver = "10.140.0.4";
 
 	use Mojo::JSON qw(from_json to_json);
         use Mojo::Redis2;
@@ -36,7 +36,7 @@ $minion->add_task(gaccput => sub {
 
 my $mongoclient = MongoDB->connect("mongodb://$mongoserver:27017");
 my $wwlogdb = $mongoclient->get_database('WalkWorldLOG');
-our $npcuserlog = $wwlogdb->get_collection('npcuserlog');  # Logingdでは無記名sub内でスコープが外れるので、公開指定をする
+our $npcuserlog = $wwlogdb->get_collection('npcuserlog');  # Logingでは無記名sub内のサブルーチン、でスコープが外れるので、公開指定をする
 
 # 表示用ログフォーマット
 sub Loging {
@@ -225,6 +225,8 @@ sub Loging {
     undef $gaccon;
 
     Loging("worker process END!!");
+    #  my $error = $job->execute;
+    #Loging("worker error: $error") if ( defined $error );
 
 });
 

@@ -42,7 +42,8 @@ sub gaccexec {
 
 sub gaccexecminion {
    my $self = shift;
-
+       
+      # 基本的にworker側で処理されるが、workerが落ちているとここで処理される ここで起動するとghostmanのポートがロックされる
    my $sid = $self->param('sid');
      if ( ! defined $sid) { return; }
 
