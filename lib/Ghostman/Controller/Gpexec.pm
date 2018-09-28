@@ -55,7 +55,7 @@ sub gaccexecminion {
      });
 
    $self->app->minion->enqueue( gaccexec => [ $sid ] );
-   $self->app->minion->perform_jobs;
+#   $self->app->minion->perform_jobs;
 
    $self->res->headers->header("Access-Control-Allow-Origin" => 'https://www.backbone.site' );
    $self->render(text => 'dummy page', status => '200');

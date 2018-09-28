@@ -59,7 +59,7 @@ sub Loging {
         my $redis ||= Mojo::Redis2->new(url => "redis://$redisserver:6379");
         my $ua = Mojo::UserAgent->new;
 
-        my $pcountchk = Pcountchk->new($host);     # AnyEvent::Condvarでエラーが起きる。　10回で終了　空配列が戻る想定
+        my $pcountchk = Pcountchk->new($host);     # AnyEvent::Condvarでエラーが起きる。　10回で終了　abort配列が戻る想定　初回は正常終了で空がある
            $pcountchk->gacccheck;
         my $res = $pcountchk->result; # $res->{proclist}に配列でsidが入っている
         my @proclist = @{$res->{proclist}};
@@ -70,9 +70,14 @@ sub Loging {
         my @coprolist = ();   # 実行中のアカウント情報の配列の配列 proclistに位置が同じはず配列だから
         my @coprocount = ();  # @coprolistに合わせてカウントす
 
+	if ($proclist[0] eq "abort" ){
+            Loging("DEBUG: Pcountchk abort END!!!");
+            return;
+	}
+
         Loging("START worker");
 
-        if ($#proclist != -1){  # 空配列ならパス
+        if ($#proclist != -1 ){  # 空配列ならパス
             for my $i (@proclist){
                 my $pacclist;
                    $pacclist = $redis->get("GACC$i");
@@ -81,29 +86,21 @@ sub Loging {
 		my $pacclist_on;
                    $pacclist_on = $redis->hvals("GACCon$i");   # 配列にテキストが入っている
 
-		   for my $i (@$pacclist_on){
+		   for my $j (@$pacclist_on){
 		       my $pacclist_one;
-                       $pacclist_one = from_json($i) if ( defined $i);
+                       $pacclist_one = from_json($j) if ( defined $j);
                        if ( defined $pacclist_one ){
                            push(@$pacclist,@$pacclist_one);   # 連想配列に連想配列をつなげる
-			   Loging("list add pacclist");
+			   Loging("already add pacclist: $j");
 		       } 
 		       undef $pacclist_one;
-    	           } # for
+    	           } # for $j
 
                 push(@coprolist,$pacclist) if ( defined $pacclist); #実行中アカウント情報の配列を取得 GACConもとりあえず追加する
                 undef $pacclist;
 		undef $pacclist_on;
 
          } # for @proclist
-
-         # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
-         if ($#proclist > 5){ # 5プロセスでリミットを設定しておく 6個まで動くがそうしないと止まってしまう　スケールアウトでラウンドロビンさせる
-             #  $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
-             #  $self->render(msg => 'this server limit over');
-	     Loging("this server limit over");
-         return;
-         }
 
          for my $i (@$gacclist){
              $i->{run} = "";  #初期化する。祓われたアカウントをクリアするため
@@ -145,23 +142,34 @@ sub Loging {
          }
 
          # 子プロセスに受け入れる容量が在るのか？確認するには
-         my $chkcount = 0;
+	 my @chkarray;
          for my $i (@coprocount){
-             my $j = $i + 1;  # 配列の添字に+1
-                $chkcount = $chkcount + ( 200 - $j);  # 空き数チェック　上限を200に想定
+             if ( $i >= 99 ) {
+                 push(@chkarray,1); 
+	     }
          }
-         if ( $chkcount < $gcount ) {
+
+         # coprolistの配列数とchkarrayが一致したら追加で作成
+         if ( $#chkarray >= $#coprolist ) {
+		 
+             # 1サーバ当たり5プロセスを上限とする。  もう一度要求が来れば、別のサーバを指定されることで追加されるはず。
+             if ($#proclist > 5){ # 5プロセスでリミットを設定しておく 6個まで動くがそうしないと止まってしまう　スケールアウトでラウンドロビンさせる
+                 #  $self->res->headers->header("Access-Control-Allow-Origin" => 'https://westwind.backbone.site' );
+                 #  $self->render(msg => 'this server limit over');
+	         Loging("this server limit over");
+                 return;
+             }
+
              #子プロセスの空きが要求個数に満たない場合、子プロセスを追加
              $sid = Sessionid->new->sid;
-             $ua->post("http://$host/gaccexec" => form => { sid => $sid });
+             $ua->post("http://$host/gaccexecminion" => form => { sid => $sid });
 	     #  $job->app->log->info("DEBUG: 2 procexec: $sid");
 	     Loging(" 2 proxexec: $sid");
              push(@proclist,$sid);
              push(@coprolist,[]);
              push(@coprocount,0);
          }
-         undef $chkcount;
-
+	 undef @chkarray;
 
          my $gaccon = {};
 
@@ -169,7 +177,7 @@ sub Loging {
              for (my $j=0; $j<=$#coprolist; $j++) {
 		     #   $job->app->log->info("DEBUG: coprocount: $coprocount[$j]");
                          Loging("DEBUG: coprocount: $coprocount[$j]");
-             if ( $coprocount[$j] >= 199 ){ #1プロセス当たり200個の上限
+             if ( $coprocount[$j] >= 99 ){ #1プロセス当たり100個の上限
                   next; # $j up   coprolistを先に進める
              }
 
@@ -214,7 +222,7 @@ sub Loging {
             $redis->expire("GACCon$key" => 12 );
 	
 	 #   $job->app->log->info("DEBUG: add gaccon: $key | $gacconjson ");
-           Loging("add gacccon: $key | $gaccon->{$key}->[0]->{email} | $gacconjson");
+           Loging("add gaccon: $key | $gaccon->{$key}->[0]->{email} | $gacconjson");
 
     }  # foreach key
 

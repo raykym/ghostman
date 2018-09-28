@@ -62,7 +62,7 @@ sub gacccheck {
    else {
       my $err = $tx->error;
          $self->{flag} = "false";
-         $self->{result} = [];
+         $self->{result} = ["abort"];
     #  die "$err->{code} responce: $err->{message}" if $err->{code};
     #  die "Connection error: $err->{message}";
          return 1;
@@ -90,6 +90,7 @@ sub result {
           } elsif ($self->{flag} eq "false"){
               $cv->send; 
           } elsif ( $cnt > 3 ) {  # リミッターを設定 3回以上回ったら終了する。 空が戻ってもパスされるだけ。
+            $self->{result} = ["abort"];
             $cv->send;
           }
         }

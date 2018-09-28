@@ -11,7 +11,7 @@ use lib '.';
 use Pcountchk;
 
 ###my $instance = Pcountchk->new("instance-1.backbone.site:3000");
-my $instance = Pcountchk->new("10.140.0.2:3000");
+my $instance = Pcountchk->new("10.140.0.3:3000");
 
 my $str = $instance->string;
 say "string: $str";

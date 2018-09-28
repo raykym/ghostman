@@ -21,8 +21,8 @@ sub startup {
                     #   listen => ['https://*:3000?cert=/etc/letsencrypt/live/instance-1.backbone.site/fullchain.pem&key=/etc/letsencrypt/live/instance-1.backbone.site/privkey.pem'],
                        listen => ['http://*:3000'],
                        accepts => 1000,
-                       clients => 1,
-                       workers => 10,
+                       clients => 100,
+                       workers => 4,
                        proxy => 1,
                        });
 
@@ -44,6 +44,8 @@ sub startup {
          });
 
    $self->plugin( Minion => { Pg => $self->app->pg });
+
+   $self->plugin('Minion::Admin'); 
 
 
   # Documentation browser under "/perldoc"

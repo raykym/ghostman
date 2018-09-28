@@ -5,7 +5,7 @@ use warnings;
 use utf8;
 use feature 'say';
 
-# useage :  makeghostacc.pl 1 100
+# useage :  makeghostacc.pl 1 100 > temp.txt
 # ghostman.confに追記するためのアカウント情報の生成 viなどで追記すること
 
 
